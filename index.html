@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      4Some Games — Golf Scoring PWA
-     Version : v1.1.0
+     Version : v1.1.2
      Build   : 2026-05-25 (v1.0.1)
      Author  : BiZStoryGuru LLC
      Deploy  : upload index.html + manifest.json + logo.png to GitHub repo root
@@ -192,7 +192,7 @@ input:checked + .slider:before{transform:translateX(20px);}
       <img class="hdr-logo" src="logo.png" alt="4Some Games">
       <div>
         <div class="hdr-title">4SOME GAMES</div>
-        <div class="hdr-sub">v1.1.0 · Build 2026-05-25</div>
+        <div class="hdr-sub">v1.1.2 · Build 2026-05-25</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
@@ -279,7 +279,7 @@ input:checked + .slider:before{transform:translateX(20px);}
     <div class="card" style="background:var(--g800);color:#fff;margin-bottom:12px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--gold);">4SOME GAMES</div>
       <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">
-        <span>Version <strong style="color:#fff;">v1.1.0</strong></span> &nbsp;·&nbsp;
+        <span>Version <strong style="color:#fff;">v1.1.2</strong></span> &nbsp;·&nbsp;
         <span id="settingsBuildTime" style="color:rgba(255,255,255,.5);"></span>
       </div>
     </div>
@@ -354,7 +354,7 @@ input:checked + .slider:before{transform:translateX(20px);}
 // ════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.2';
 const BUILD_TIME  = '2026-05-25 18:39';  // v1.0 original
 const VERSION_KEY = 'fs_version';
 
@@ -1054,11 +1054,17 @@ function getPickedPlayerIds() {
 }
 
 function showGameTypePicker() {
-  // Use already-captured ids if checklist DOM is gone (e.g. coming back from a setup screen)
+  // Prefer live checklist; fall back to cached _pickedIds only when navigating
+  // back from a setup screen (checklist DOM is gone). Validate all IDs exist.
   const fromChecklist = [...document.querySelectorAll('#player-checklist input:checked')].map(x=>x.value);
-  if (fromChecklist.length===4) window._pickedIds = fromChecklist;
-  if (!window._pickedIds || window._pickedIds.length!==4) return toast('Select exactly 4 players');
-  const players=window._pickedIds.map(id=>playerById(id));
+  if (fromChecklist.length===4) {
+    window._pickedIds = fromChecklist;
+  } else if (!window._pickedIds || window._pickedIds.length!==4) {
+    return toast('Select exactly 4 players');
+  }
+  // Validate cached IDs are still valid roster entries
+  const players = window._pickedIds.map(id=>playerById(id)).filter(Boolean);
+  if (players.length!==4) { window._pickedIds=null; return toast('Player roster changed — reselect players'); }
   document.getElementById('game-area').innerHTML=`
     <div class="card">
       <div class="card-title">Choose Game Type</div>
@@ -1230,6 +1236,11 @@ function startDOCGame() {
 }
 
 // ─── DOC GAME RENDER ───
+// docMatchDefs: builds the three match definitions for a DOC game.
+// DOC = Drivers vs Passengers, Opposites, Cart Partners.
+// Each segment plays the same 18 holes (split into three 6-hole overlapping
+// matches): segment 0 = holes 1-6, segment 1 = holes 7-12, segment 2 = holes 13-18.
+// team1/team2 are arrays of two player IDs; t1lbl/t2lbl are display names.
 function docMatchDefs(g) {
   const {cart1,cart2}=g.carts;
   // Helper: first name of player by id
@@ -1783,6 +1794,15 @@ function showWalkoffSetup() {
   refreshTeamAssign();
 }
 
+// ════════════════════════════════════════════
+// 20/10 WALK-OFF
+// Two-team match play. Match 1 costs $20, Match 2 costs $10. Matches are
+// sequential — when Match 1 closes (winner mathematically determined before
+// 18 holes), Match 2 starts on the next hole. Each match is hole-by-hole
+// best-ball net (gross - strokes). Dormie detection prevents a closed match
+// from being overturned. calcOneMatch() handles all match state; woAutoAdvance()
+// scans for auto-closures after each score entry.
+// ════════════════════════════════════════════
 function startWalkoffGame() {
   const ts=window._teamState;
   if ((ts.A||[]).length!==2||(ts.B||[]).length!==2) return toast('Assign 2 players to each team');
@@ -1814,6 +1834,10 @@ function startWalkoffGame() {
 // Auto-close: when |diff| > remaining holes, the trailing team can't catch up.
 // Dormie: |diff| === remaining — trailing team can only tie at best.
 // Returns a full status object used by banners, popup, and settlement.
+// calcOneMatch: scores a single match from its startHole to end of course.
+// Returns status object with diff (positive=A leads), thru (holes played),
+// isDormie (lead equals holes remaining), isClosed, winner, and CSS classes.
+// 999 = no score entered — hole treated as unplayed.
 function calcOneMatch(g, match) {
   const course=courseById(g.courseId); if (!course) return null;
   const allHoles=course.holes;
@@ -2124,7 +2148,11 @@ function calcWalkoffMatch(g, matchNum) {
 
 
 // ════════════════════════════════════════════
-// FRONT / BACK / TOTAL SETUP
+// NASSAU (FRONT / BACK / TOTAL)
+// Three independent best-ball matches: Front 9, Back 9, and full 18.
+// Each match has its own bet amount (costF, costB, costT). Winner of each
+// segment is determined by total net strokes (best-ball per hole, then sum).
+// calcFBTSeg() scores any set of holes; renderFBTGame() scores all three.
 // ════════════════════════════════════════════
 function showFBTSetup() {
   window._teamState={A:[],B:[]};
