@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      4Some Games — Golf Scoring PWA
-     Version : v1.0.8
+     Version : v1.0.9
      Build   : 2026-05-25 (v1.0.1)
      Author  : BiZStoryGuru LLC
      Deploy  : upload index.html + manifest.json + logo.png to GitHub repo root
@@ -192,7 +192,7 @@ input:checked + .slider:before{transform:translateX(20px);}
       <img class="hdr-logo" src="logo.png" alt="4Some Games">
       <div>
         <div class="hdr-title">4SOME GAMES</div>
-        <div class="hdr-sub">v1.0.8 · Build 2026-05-25</div>
+        <div class="hdr-sub">v1.0.9 · Build 2026-05-25</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
@@ -279,7 +279,7 @@ input:checked + .slider:before{transform:translateX(20px);}
     <div class="card" style="background:var(--g800);color:#fff;margin-bottom:12px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--gold);">4SOME GAMES</div>
       <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">
-        <span>Version <strong style="color:#fff;">v1.0.8</strong></span> &nbsp;·&nbsp;
+        <span>Version <strong style="color:#fff;">v1.0.9</strong></span> &nbsp;·&nbsp;
         <span id="settingsBuildTime" style="color:rgba(255,255,255,.5);"></span>
       </div>
     </div>
@@ -354,7 +354,7 @@ input:checked + .slider:before{transform:translateX(20px);}
 // ════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 const BUILD_TIME  = '2026-05-25 18:39';  // v1.0 original
 const VERSION_KEY = 'fs_version';
 
@@ -681,6 +681,25 @@ function rosterDeletePlayer(pid) {
   S.players = S.players.filter(x=>x.id!==pid);
   scheduleWrite(); renderPlayers(); toast('Player removed');
 }
+// ── GHIN fetch utility ────────────────────────────────────────────────────
+// Single canonical GHIN fetch used by all refresh functions.
+// Posts ghin numbers to proxy, returns results array. Returns [] on any error.
+// Callers handle their own UI updates and state writes.
+async function ghinFetch(proxy, players) {
+  const withGhin = players.filter(p => p.ghin);
+  if (!withGhin.length || !proxy) return [];
+  try {
+    const r = await fetch(proxy, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ghinNumbers: withGhin.map(p => p.ghin) })
+    });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return d.results || [];
+  } catch(e) { return []; }
+}
+
 async function rosterRefreshGhin() {
   const withGhin = S.players.filter(p=>p.ghin);
   if (!withGhin.length) return toast('No players have a GHIN number');
@@ -688,19 +707,15 @@ async function rosterRefreshGhin() {
   if (!proxy) return toast('Add GHIN Proxy URL in Settings first');
   const statusEl = document.getElementById('roster-ghin-status');
   statusEl.style.display=''; statusEl.textContent=`Fetching ${withGhin.length} indexes…`;
-  try {
-    const r = await fetch(proxy, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ghinNumbers: withGhin.map(p=>p.ghin) }) });
-    const d = await r.json();
-    let updated=0;
-    (d.results||[]).forEach(res => {
-      const p = S.players.find(x=>String(x.ghin)===String(res.ghin));
-      if (p && res.handicap_index!=null) { p.hcp=res.handicap_index; updated++; }
-    });
-    scheduleWrite(); renderPlayers();
-    statusEl.textContent=`✓ Updated ${updated} index${updated!==1?'es':''}`;
-    setTimeout(()=>{statusEl.style.display='none';},3000);
-  } catch(e) { statusEl.textContent='✗ Fetch failed'; setTimeout(()=>{statusEl.style.display='none';},3000); }
+  const results = await ghinFetch(proxy, withGhin);
+  let updated=0;
+  results.forEach(res => {
+    const p = S.players.find(x=>String(x.ghin)===String(res.ghin));
+    if (p && res.handicap_index!=null) { p.hcp=res.handicap_index; updated++; }
+  });
+  scheduleWrite(); renderPlayers();
+  statusEl.textContent = updated ? `✓ Updated ${updated} index${updated!==1?'es':''}` : '✗ Fetch failed';
+  setTimeout(()=>{ statusEl.style.display='none'; }, 3000);
 }
 async function importFromExtras(league) {
   const statusEl = document.getElementById('importStatus');
@@ -942,17 +957,13 @@ async function refreshSelectedIndexes(selectedIds) {
   if (!proxy) return; // silently skip — no proxy configured
   const withGhin=selectedIds.map(id=>playerById(id)).filter(p=>p&&p.ghin);
   if (!withGhin.length) return;
-  try {
-    const r=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ghinNumbers:withGhin.map(p=>p.ghin)})});
-    const d=await r.json();
-    let updated=0;
-    (d.results||[]).forEach(res=>{
-      const p=S.players.find(x=>String(x.ghin)===String(res.ghin));
-      if (p&&res.handicap_index!=null){p.hcp=res.handicap_index;updated++;}
-    });
-    if (updated>0) { scheduleWrite(); toast(`✓ Refreshed ${updated} HI`); }
-  } catch(e) { toast('GHIN refresh failed'); }
+  const results = await ghinFetch(proxy, withGhin);
+  let updated=0;
+  results.forEach(res=>{
+    const p=S.players.find(x=>String(x.ghin)===String(res.ghin));
+    if (p&&res.handicap_index!=null){p.hcp=res.handicap_index;updated++;}
+  });
+  if (updated>0) { scheduleWrite(); toast(`✓ Refreshed ${updated} HI`); }
 }
 
 // ════════════════════════════════════════════
