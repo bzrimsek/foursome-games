@@ -1,5 +1,12 @@
-<!-- 4Some Games — v1.0 | 2026-05-25 18:00 UTC -->
 <!DOCTYPE html>
+<!-- ============================================================
+     4Some Games — Golf Scoring PWA
+     Version : v1.0
+     Build   : 2026-05-25 18:39
+     Author  : BiZStoryGuru LLC
+     Deploy  : upload index.html + manifest.json + logo.png to GitHub repo root
+     Firebase: extras-manager-default-rtdb.firebaseio.com/foursome/state.json
+============================================================ -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -185,7 +192,7 @@ input:checked + .slider:before{transform:translateX(20px);}
       <img class="hdr-logo" src="logo.png" alt="4Some Games">
       <div>
         <div class="hdr-title">4SOME GAMES</div>
-        <div class="hdr-sub">v1.0 · foursome scoring</div>
+        <div class="hdr-sub">v1.0 · Build 2026-05-25 18:39</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
@@ -271,7 +278,10 @@ input:checked + .slider:before{transform:translateX(20px);}
   <div class="tab" id="tab-settings-content">
     <div class="card" style="background:var(--g800);color:#fff;margin-bottom:12px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--gold);">4SOME GAMES</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">Version <strong style="color:#fff;">1.0</strong></div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">
+        <span>Version <strong style="color:#fff;">v1.0</strong></span> &nbsp;·&nbsp;
+        <span id="settingsBuildTime" style="color:rgba(255,255,255,.5);"></span>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">Import from Extras Manager</div>
@@ -345,6 +355,7 @@ input:checked + .slider:before{transform:translateX(20px);}
 // CONSTANTS
 // ════════════════════════════════════════════
 const APP_VERSION = '1.0';
+const BUILD_TIME  = '2026-05-25 18:39';
 const VERSION_KEY = 'fs_version';
 
 
@@ -765,6 +776,8 @@ function deleteCourse(id) {
 // SETTINGS
 // ════════════════════════════════════════════
 function renderSettings() {
+  const btEl = document.getElementById('settingsBuildTime');
+  if (btEl) btEl.textContent = 'Build ' + BUILD_TIME;
   const proxy=document.getElementById('cfgGhinProxy');
   if (proxy) proxy.value=S.config.ghinProxyUrl||'';
   const chk=document.getElementById('adminModeToggle');
